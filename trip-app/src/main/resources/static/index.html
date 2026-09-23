@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>杭城出行 · 通勤决策一秒拿捏</title>
+<style>
+  :root {
+    --navy: #1c2b4a;
+    --navy-2: #24365c;
+    --orange: #ff7a1a;
+    --orange-soft: rgba(255, 122, 26, .12);
+    --m1: #c23a30; --m2: #2e6bb0; --m10: #3f9d6b;
+    --bg: #f4f6fa;
+    --ink: #17233d;
+    --ink-2: #5a6b8c;
+    --line: #dfe6f2;
+    --card: #ffffff;
+    --ok: #1d9d6f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    background-image:
+      radial-gradient(circle at 12% 8%, rgba(255,122,26,.05), transparent 42%),
+      radial-gradient(circle at 88% 4%, rgba(46,107,176,.06), transparent 38%);
+  }
+  /* ===== 轨迹点线纹理 ===== */
+  .track-bg {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: .5;
+    background-image: repeating-linear-gradient(115deg, transparent 0 46px, rgba(28,43,74,.045) 46px 48px);
+  }
+  header {
+    position: relative; z-index: 1;
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 78%, #2a4270 100%);
+    color: #fff; padding: 34px 0 26px;
+    border-bottom: 4px solid var(--orange);
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand-badge {
+    width: 44px; height: 44px; border-radius: 12px; flex: none;
+    background: var(--orange); display: flex; align-items: center; justify-content: center;
+    font-size: 22px; box-shadow: 0 4px 14px rgba(255,122,26,.45);
+  }
+  .brand h1 { font-size: 22px; letter-spacing: 1px; }
+  .brand small { color: #9db1d6; font-size: 12px; letter-spacing: 2px; }
+  .hero { margin-top: 26px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+  .hero h2 { font-size: 34px; line-height: 1.3; }
+  .hero h2 em { color: var(--orange); font-style: normal; }
+  .hero p { color: #aebdd9; margin-top: 8px; font-size: 14px; }
+  .stats { display: flex; gap: 34px; }
+  .stat b { display: block; font-size: 30px; color: #fff; }
+  .stat b i { font-style: normal; color: var(--orange); }
+  .stat span { font-size: 12px; color: #8ba0c6; letter-spacing: 1px; }
+  main { position: relative; z-index: 1; max-width: 1180px; margin: 26px auto 0; padding: 0 24px 70px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 22px; box-shadow: 0 2px 10px rgba(28,43,74,.05);
+  }
+  .card h3 { font-size: 17px; display: flex; align-items: center; gap: 10px; }
+  .card h3::before { content: ""; width: 5px; height: 18px; border-radius: 3px; background: var(--orange); }
+  .card h3 .sub { font-size: 12px; color: var(--ink-2); font-weight: 400; }
+  /* ===== 规划表单 ===== */
+  .plan-form { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 10px; }
+  .plan-form select, .plan-form input {
+    height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px;
+    font-size: 14px; color: var(--ink); background: #fbfcfe; outline: none; width: 100%;
+  }
+  .plan-form select:focus, .plan-form input:focus { border-color: var(--orange); }
+  .btn {
+    height: 42px; padding: 0 22px; border: 0; border-radius: 10px; cursor: pointer;
+    background: var(--orange); color: #fff; font-size: 15px; font-weight: 600;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(255,122,26,.35); }
+  .btn.ghost { background: #fff; color: var(--orange); border: 1px solid var(--orange); }
+  .swap-btn { height: 42px; padding: 0 12px; border: 1px solid var(--line); background: #fff; border-radius: 10px; cursor: pointer; font-size: 16px; }
+  /* ===== 方案卡 ===== */
+  #plans { margin-top: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .plan {
+    border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; position: relative;
+    background: #fff; transition: border-color .2s;
+  }
+  .plan.best { border-color: var(--orange); box-shadow: 0 6px 18px rgba(255,122,26,.14); }
+  .plan .tag {
+    position: absolute; top: -10px; left: 16px; background: var(--orange); color: #fff;
+    font-size: 11px; padding: 2px 10px; border-radius: 20px; letter-spacing: 1px;
+  }
+  .plan .head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .plan .mode { font-size: 15px; font-weight: 700; }
+  .plan .mode small { color: var(--ink-2); font-weight: 400; margin-left: 8px; font-size: 12px; }
+  .plan .metrics { text-align: right; white-space: nowrap; }
+  .plan .metrics b { font-size: 20px; color: var(--navy); }
+  .plan .metrics span { color: var(--ink-2); font-size: 12px; margin-left: 10px; }
+  /* 轨迹进度条：点线 + 节点圆点 */
+  .track { margin: 14px 0 6px; position: relative; height: 26px; }
+  .track .rail {
+    position: absolute; top: 12px; left: 8px; right: 8px; height: 0;
+    border-top: 2px dashed #b8c6de;
+  }
+  .track .dot {
+    position: absolute; top: 7px; width: 12px; height: 12px; border-radius: 50%;
+    background: #fff; border: 3px solid var(--navy);
+  }
+  .track .dot.start { left: 2px; border-color: var(--ok); }
+  .track .dot.end { right: 2px; border-color: var(--orange); }
+  .track .lbl { position: absolute; top: -12px; font-size: 11px; color: var(--ink-2); white-space: nowrap; }
+  .track .lbl.l { left: 0; } .track .lbl.r { right: 0; }
+  .steps { font-size: 12.5px; color: var(--ink-2); line-height: 1.9; }
+  .steps b { color: var(--ink); }
+  .hint-empty { color: var(--ink-2); font-size: 13px; padding: 18px 0 8px; text-align: center; }
+  /* ===== 地铁图 ===== */
+  .metro-card { grid-column: 1 / -1; }
+  .metro-canvas { overflow-x: auto; margin-top: 14px; }
+  .metro-canvas svg { min-width: 1060px; display: block; }
+  .st-click { cursor: pointer; }
+  .st-click:hover circle { stroke-width: 4; }
+  /* ===== 双栏下排 ===== */
+  .bus-list { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .bus-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+  .bus-item b { color: var(--navy); }
+  .bus-item .no { background: var(--orange-soft); color: var(--orange); border-radius: 6px; padding: 1px 8px; font-weight: 700; flex: none; }
+  .taxi-cards { margin-top: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .taxi { border: 1px solid var(--line); border-radius: 12px; padding: 14px; text-align: center; }
+  .taxi .t-name { font-weight: 700; color: var(--navy); font-size: 14px; }
+  .taxi .t-price { font-size: 22px; color: var(--orange); font-weight: 800; margin: 6px 0 2px; }
+  .taxi .t-price i { font-style: normal; font-size: 12px; color: var(--ink-2); font-weight: 400; }
+  .taxi .t-desc { font-size: 11px; color: var(--ink-2); line-height: 1.6; }
+  /* ===== AI 面板 ===== */
+  .ai-fab {
+    position: fixed; right: 26px; bottom: 26px; z-index: 30;
+    width: 58px; height: 58px; border-radius: 50%; border: 0; cursor: pointer;
+    background: var(--navy); color: #fff; font-size: 26px;
+    box-shadow: 0 8px 22px rgba(28,43,74,.4); transition: transform .15s;
+  }
+  .ai-fab:hover { transform: scale(1.06); }
+  .ai-fab::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%;
+    border: 2px solid rgba(255,122,26,.5); animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%{transform:scale(.9);opacity:1} 100%{transform:scale(1.25);opacity:0} }
+  .ai-panel {
+    position: fixed; top: 0; right: -480px; width: 460px; max-width: 94vw; height: 100vh; z-index: 40;
+    background: #fff; box-shadow: -8px 0 30px rgba(28,43,74,.18);
+    display: flex; flex-direction: column; transition: right .28s ease;
+  }
+  .ai-panel.open { right: 0; }
+  .ai-head { background: var(--navy); color: #fff; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; }
+  .ai-head b { font-size: 15px; }
+  .ai-head span { font-size: 11px; color: #9db1d6; display: block; margin-top: 2px; }
+  .ai-close { background: none; border: 0; color: #fff; font-size: 20px; cursor: pointer; }
+  .ai-msgs { flex: 1; overflow-y: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; background: #f8fafd; }
+  .msg { max-width: 86%; padding: 10px 14px; border-radius: 12px; font-size: 13.5px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--orange); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: #fff; border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .msg.bot.streaming::after { content: "▍"; color: var(--orange); animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .ai-input { display: flex; gap: 8px; padding: 14px; border-top: 1px solid var(--line); }
+  .ai-input input { flex: 1; height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; outline: none; font-size: 14px; }
+  .ai-input input:focus { border-color: var(--orange); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 14px 12px; background: #f8fafd; }
+  .chip { font-size: 12px; border: 1px solid var(--line); background: #fff; border-radius: 16px; padding: 5px 12px; cursor: pointer; color: var(--ink-2); }
+  .chip:hover { border-color: var(--orange); color: var(--orange); }
+  footer { text-align: center; color: #93a3c0; font-size: 12px; padding: 26px 0 34px; }
+</style>
+</head>
+<body>
+<div class="track-bg"></div>
+
+<header>
+  <div class="wrap">
+    <div class="brand">
+      <div class="brand-badge">🚇</div>
+      <div><h1>杭城出行规划台</h1><small>HANGZHOU TRIP PLANNER · DSH P5</small></div>
+    </div>
+    <div class="hero">
+      <div>
+        <h2>通勤决策，<em>一秒拿捏</em></h2>
+        <p>地铁 · 公交 · 打车三网聚合，最快 / 最便宜 / 少步行，一次给出三种答案</p>
+      </div>
+      <div class="stats">
+        <div class="stat"><b><i>3</i> 线</b><span>地铁线网 25 站</span></div>
+        <div class="stat"><b>12 <i>条</i></b><span>公交线路全覆盖</span></div>
+        <div class="stat"><b><i>3</i> 档</b><span>打车车型透明计价</span></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="grid">
+    <!-- 出行规划 -->
+    <div class="card">
+      <h3>出行规划 <span class="sub">一次对比三种方案</span></h3>
+      <div class="plan-form">
+        <select id="fromSel"></select>
+        <button class="swap-btn" id="swapBtn" title="交换起终点">⇄</button>
+        <select id="toSel"></select>
+      </div>
+      <div class="plan-form" style="grid-template-columns: 1fr 1fr auto; margin-top:10px;">
+        <select id="hourSel"></select>
+        <select id="prefSel">
+          <option value="fastest">⏱ 优先：最快到达</option>
+          <option value="cheapest">💰 优先：花销最少</option>
+          <option value="leastWalk">🚶 优先：少走路</option>
+        </select>
+        <button class="btn" id="planBtn">开始规划</button>
+      </div>
+      <div id="plans"><div class="hint-empty">选择出发地与目的地，点击「开始规划」查看三种方案 →</div></div>
+    </div>
+
+    <!-- 打车 -->
+    <div class="card">
+      <h3>打车计价 <span class="sub">起步价 + 里程 + 时长，高峰溢价透明可见</span></h3>
+      <div class="plan-form" style="grid-template-columns: 1fr 1fr auto;">
+        <input type="number" id="taxiKm" value="8.5" min="0.5" step="0.5" placeholder="里程 km">
+        <select id="taxiRush">
+          <option value="false">平峰</option>
+          <option value="true">早晚高峰（×1.3）</option>
+        </select>
+        <button class="btn ghost" id="taxiBtn">估算</button>
+      </div>
+      <div class="taxi-cards" id="taxiCards"></div>
+    </div>
+
+    <!-- 地铁线网 -->
+    <div class="card metro-card">
+      <h3>地铁线网图 <span class="sub">点击站名即可设为出发地 / 目的地</span></h3>
+      <div class="metro-canvas" id="metroCanvas"></div>
+    </div>
+
+    <!-- 公交 -->
+    <div class="card">
+      <h3>公交线路 <span class="sub">12 条线路 · 首末班与发车间隔</span></h3>
+      <div class="plan-form" style="grid-template-columns: 1fr auto;">
+        <input id="busStop" placeholder="输入站名筛选，如：黄龙 / 武林广场 / 湖滨（留空显示全部）">
+        <button class="btn ghost" id="busBtn">查询</button>
+      </div>
+      <div class="bus-list" id="busList"></div>
+    </div>
+
+    <!-- 使用说明 -->
+    <div class="card">
+      <h3>怎么用 <span class="sub">三步上手</span></h3>
+      <div class="steps" style="margin-top:14px;font-size:13.5px;">
+        <b>① 选起终点</b>：下拉或点地铁图选站，支持地标（西湖·断桥残雪、湖滨银泰 in77 等）。<br>
+        <b>② 开始规划</b>：一次返回「最快 / 最便宜 / 少步行」三方案，橙框为推荐项。<br>
+        <b>③ 问 AI 助手</b>：右下角悬浮球，用大白话问「早八点从龙翔桥去良渚怎么走最省」。<br><br>
+        <b style="color:var(--orange)">AI 助手能做</b>：三方案推荐、两站间地铁换乘详解、按站查公交、打车估价、模糊找站。<br>
+        <b>计价口径</b>：地铁按里程阶梯（¥2 起），公交 ¥2~4，打车起步 11 元 + 2.5 元/km（高峰×1.3）。
+      </div>
+    </div>
+  </div>
+</main>
+
+<button class="ai-fab" id="aiFab" title="AI 出行助手">💬</button>
+
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-head">
+    <div><b>🚇 AI 出行助手</b><span>接入 DSH Harness · trip-assistant 插件</span></div>
+    <button class="ai-close" id="aiClose">✕</button>
+  </div>
+  <div class="ai-msgs" id="aiMsgs">
+    <div class="msg bot">你好！我是杭城出行助手 🚇<br>可以问我：<b>「早八点从武林广场去良渚，最快怎么走？」「龙翔桥打车去杭州东站多少钱？」</b></div>
+  </div>
+  <div class="chips">
+    <span class="chip" data-q="早上八点半从武林广场去良渚，帮我规划三种方案">早高峰跨城通勤</span>
+    <span class="chip" data-q="龙翔桥到浙大坐地铁怎么换乘？">地铁换乘详解</span>
+    <span class="chip" data-q="黄龙体育中心附近有哪些公交？">站旁公交线路</span>
+    <span class="chip" data-q="打车 12 公里高峰期要多少钱？">打车估价</span>
+  </div>
+  <div class="ai-input">
+    <input id="aiInput" placeholder="用大白话描述你的出行需求…">
+    <button class="btn" id="aiSend">发送</button>
+  </div>
+</div>
+
+<footer>杭城出行规划台 · P5 场景案例 · 数据为教学模拟，供 DSH Java 插件演示使用</footer>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const API = '';
+
+/* ---------- 初始化下拉 ---------- */
+async function boot() {
+  const r = await fetch(API + '/api/search?keyword=');
+  const { data } = await r.json();
+  const opts = data.map(x => `<option value="${esc(x.name)}">${esc(x.name)}</option>`).join('');
+  $('#fromSel').innerHTML = opts;
+  $('#toSel').innerHTML = opts;
+  $('#toSel').selectedIndex = Math.min(6, data.length - 1);
+  const hs = [];
+  for (let h = 6; h <= 23; h++) hs.push(`<option value="${h}:30">${h}:30${h<9||h>17?'':'（高峰）'}</option>`);
+  $('#hourSel').innerHTML = hs.join('');
+  $('#hourSel').value = '8:30';
+  loadTaxi(); loadBus(''); loadMetro();
+}
+
+/* ---------- 出行规划 ---------- */
+async function doPlan() {
+  $('#plans').innerHTML = '<div class="hint-empty">⏳ 规划中…</div>';
+  const body = {
+    from: $('#fromSel').value, to: $('#toSel').value,
+    hour: $('#hourSel').value, pref: $('#prefSel').value
+  };
+  const r = await fetch(API + '/api/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const { data } = await r.json();
+  if (!data || !data.candidates || !data.candidates.length) {
+    $('#plans').innerHTML = '<div class="hint-empty">这两个地点之间暂无可用方案，试试地铁站点或其它地标。</div>';
+    return;
+  }
+  $('#plans').innerHTML = data.candidates.map((c, i) => {
+    const best = c.tag === data.fastest;
+    const label = { fastest: '⚡ 最快推荐', cheapest: '💰 最便宜', leastWalk: '🚶 少步行' }[data.fastest] || '⚡ 最快推荐';
+    const p = c.steps && c.steps.length > 1 ? 100 / (c.steps.length - 1) : 0;
+    return `
+    <div class="plan ${best ? 'best' : ''}">
+      ${best ? `<div class="tag">${label}</div>` : ''}
+      <div class="head">
+        <div class="mode">🚀 ${esc(c.label)}<small>${esc(c.summary)}</small></div>
+        <div class="metrics"><b>${c.totalMinutes}</b> 分钟<span>¥${c.fare}</span><span>步行 ${c.walkMin} 分钟</span></div>
+      </div>
+      <div class="track">
+        <div class="rail"></div>
+        <div class="dot start"></div><div class="dot end"></div>
+        <div class="lbl l">${esc(data.from)}</div><div class="lbl r">${esc(data.to)}</div>
+        ${c.steps && c.steps.length > 2 ? c.steps.slice(1, -1).map((s, j) =>
+          `<div class="dot" style="left:calc(${p * (j + 1)}% - 4px)" title="${esc(s)}"></div>`).join('') : ''}
+      </div>
+      <div class="steps">${(c.steps || []).map(s => '· ' + esc(s)).join('<br>')}</div>
+    </div>`;
+  }).join('');
+}
+$('#planBtn').onclick = doPlan;
+$('#swapBtn').onclick = () => {
+  const a = $('#fromSel').value; $('#fromSel').value = $('#toSel').value; $('#toSel').value = a;
+};
+
+/* ---------- 打车 ---------- */
+async function loadTaxi() {
+  const km = $('#taxiKm').value || 8.5;
+  const rush = $('#taxiRush').value;
+  const r = await fetch(API + `/api/taxi/compare?km=${km}&rushHour=${rush}`);
+  const { data } = await r.json();
+  $('#taxiCards').innerHTML = (data || []).map(t => `
+    <div class="taxi" title="${esc(t.breakdown)}">
+      <div class="t-name">${esc(t.label)}</div>
+      <div class="t-price">¥${t.fare} <i>预估</i></div>
+      <div class="t-desc">${esc(t.carDesc)}</div>
+      <div class="t-desc" style="margin-top:6px;color:var(--orange)">${esc(t.breakdown)}</div>
+    </div>`).join('') || '<div class="hint-empty">暂无数据</div>';
+}
+$('#taxiBtn').onclick = loadTaxi;
+
+/* ---------- 公交 ---------- */
+async function loadBus(stop) {
+  const r = await fetch(API + '/api/bus?stop=' + encodeURIComponent(stop || ''));
+  const { data } = await r.json();
+  $('#busList').innerHTML = (data || []).map(b => `
+    <div class="bus-item">
+      <span class="no">${esc(b.name)}</span>
+      <span style="flex:1"><b>${esc(b.from)} ↔ ${esc(b.to)}</b><br><span style="color:var(--ink-2)">${esc(b.stops.length)} 站 · 票价 ¥${b.fare} · 约 ${b.headwayMin} 分钟/班 · 步行到站约 ${b.walkToStopMin} 分钟</span></span>
+      <span style="color:var(--ink-2);white-space:nowrap">${esc(b.firstBus)} — ${esc(b.lastBus)}</span>
+    </div>`).join('') || '<div class="hint-empty">没有匹配的线路</div>';
+}
+$('#busBtn').onclick = () => loadBus($('#busStop').value.trim());
+
+/* ---------- 地铁 SVG 线网图 ---------- */
+const LINE_COLORS = {};
+async function loadMetro() {
+  const r = await fetch(API + '/api/metro/lines');
+  const { data } = await r.json();
+  const W = 1060, rowGap = 84, top = 70, left = 70;
+  const pos = {};   // station -> [{x,y}]
+  let svg = `<svg viewBox="0 0 ${W} ${top + data.length * rowGap + 40}" font-family="PingFang SC, sans-serif">`;
+  data.forEach((line, li) => {
+    LINE_COLORS[line.id] = line.color;
+    const y = top + li * rowGap + 18;
+    const n = line.stations.length;
+    const gap = (W - left * 2) / (n - 1);
+    svg += `<text x="${left - 40}" y="${y + 5}" font-size="13" font-weight="700" fill="${line.color}">${esc(line.name)}</text>`;
+    svg += `<line x1="${left}" y1="${y}" x2="${W - left}" y2="${y}" stroke="${line.color}" stroke-width="5" stroke-linecap="round"/>`;
+    line.stations.forEach((st, i) => {
+      const x = left + i * gap;
+      (pos[st] = pos[st] || []).push({ x, y, line: line.id });
+      svg += `<circle cx="${x}" cy="${y}" r="6" fill="#fff" stroke="${line.color}" stroke-width="3"/>`;
+      const flip = i % 2 === 1;
+      svg += `<text x="${x}" y="${y + (flip ? 22 : -14)}" font-size="11" text-anchor="middle" fill="#44506b" class="st-name">${esc(st)}</text>`;
+    });
+  });
+  // 换乘站：多线经过 → 双环橙圈
+  const transfers = new Set();
+  Object.entries(pos).forEach(([st, arr]) => { if (arr.length > 1) transfers.add(st); });
+  transfers.forEach(st => {
+    pos[st].forEach(p => {
+      svg += `<circle cx="${p.x}" cy="${p.y}" r="10" fill="none" stroke="var(--orange)" stroke-width="2.5" stroke-dasharray="3 2"/>`;
+    });
+  });
+  svg += `<text x="${W - left}" y="${top + data.length * rowGap + 26}" font-size="11" text-anchor="end" fill="#8194b5">◎ 虚线橙圈 = 换乘站（点击任意站名设为起终点）</text>`;
+  svg += '</svg>';
+  $('#metroCanvas').innerHTML = svg;
+  // 点击站名 → 写入规划表单
+  document.querySelectorAll('#metroCanvas text').forEach(t => {
+    t.classList.add('st-click');
+    t.onclick = () => {
+      const name = t.textContent;
+      if (! $('#fromSel').dataset.picked) { $('#fromSel').value = name; $('#fromSel').dataset.picked = '1'; }
+      else { $('#toSel').value = name; delete $('#fromSel').dataset.picked; }
+    };
+  });
+}
+
+/* ---------- AI 助手（SSE 流式） ---------- */
+const panel = $('#aiPanel');
+$('#aiFab').onclick = () => panel.classList.add('open');
+$('#aiClose').onclick = () => panel.classList.remove('open');
+let busy = false;
+async function ask(q) {
+  if (busy || !q.trim()) return;
+  busy = true;
+  addMsg('user', q);
+  const bot = addMsg('bot', '');
+  bot.classList.add('streaming');
+  try {
+    const r = await fetch(API + '/api/assistant/stream', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: q })
+    });
+    if (!r.ok || !r.body) throw new Error('http ' + r.status);
+    const reader = r.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();
+      for (const line of lines) {
+        if (!line.startsWith('data:')) continue;
+        const payload = line.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const j = JSON.parse(payload);
+          const piece = j.content ?? j.delta ?? j.answer ?? '';
+          if (piece) bot.textContent += piece;
+          bot.parentElement.scrollTop = bot.parentElement.scrollHeight;
+        } catch (e) { /* 跳过非 JSON 心跳 */ }
+      }
+    }
+    if (!bot.textContent) bot.textContent = '（AI 暂未返回内容，请稍后重试或检查 DSH 插件是否已激活）';
+  } catch (e) {
+    bot.textContent = '助手暂时联系不上（' + e.message + '）。页面数据功能不受影响，可直接使用规划 / 打车 / 公交查询。';
+  }
+  bot.classList.remove('streaming');
+  busy = false;
+}
+function addMsg(cls, text) {
+  const d = document.createElement('div');
+  d.className = 'msg ' + cls;
+  d.textContent = text;
+  $('#aiMsgs').appendChild(d);
+  $('#aiMsgs').scrollTop = $('#aiMsgs').scrollHeight;
+  return d;
+}
+$('#aiSend').onclick = () => { ask($('#aiInput').value); $('#aiInput').value = ''; };
+$('#aiInput').addEventListener('keydown', e => { if (e.key === 'Enter') { ask($('#aiInput').value); $('#aiInput').value = ''; } });
+document.querySelectorAll('.chip').forEach(c => c.onclick = () => ask(c.dataset.q));
+
+boot();
+</script>
+</body>
+</html>

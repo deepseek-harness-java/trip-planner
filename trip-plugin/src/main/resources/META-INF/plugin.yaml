@@ -1,0 +1,6 @@
+id: trip-assistant
+name: 城市出行规划助手
+version: 1.0.0
+author: xfg-studio
+description: 城市出行规划助手，聚合地铁/公交/打车三种方式，一次给出最快、最便宜、少步行三种方案，并支持地铁换乘路径、公交线路、打车计价查询与站点模糊定位。
+entrypoint: cn.xiaofuge.trip.plugin.TripPlugin
